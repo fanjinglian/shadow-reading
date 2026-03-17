@@ -1,0 +1,13 @@
+# WeChat mini program
+unpackage/
+node_modules/
+miniprogram_npm/
+dist/
+.DS_Store
+.idea/
+*.log
+# Python
+__pycache__/
+*.pyc
+.env
+.venv/

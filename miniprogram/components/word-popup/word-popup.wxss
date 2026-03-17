@@ -1,0 +1,53 @@
+.popup-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40rpx;
+  z-index: 999;
+}
+
+.popup-card {
+  width: 80%;
+  padding: 48rpx 40rpx;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.popup-title {
+  font-size: 44rpx;
+  font-weight: 600;
+}
+
+.popup-close {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.popup-ipa {
+  font-size: 32rpx;
+  color: #4b5563;
+  margin-bottom: 32rpx;
+  display: block;
+}
+
+.popup-play {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+}

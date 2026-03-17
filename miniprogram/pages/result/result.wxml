@@ -1,0 +1,17 @@
+<view class="result-page">
+  <view class="summary card">
+    <text class="summary-title">Great Job!</text>
+    <text class="summary-desc">你完成了 {{total}} 句 shadow。</text>
+    <text class="summary-desc">练习耗时 {{durationLabel}}</text>
+  </view>
+
+  <view class="preview card" wx:if="{{preview}}">
+    <text class="preview-label">练习文本片段</text>
+    <text class="preview-text">{{preview}}...</text>
+  </view>
+
+  <view class="result-actions">
+    <button class="btn-secondary" bindtap="handleReplay">再练一次</button>
+    <button class="btn-primary" bindtap="handleBackHome">返回首页</button>
+  </view>
+</view>

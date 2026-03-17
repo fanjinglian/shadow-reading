@@ -1,0 +1,5 @@
+{
+  "usingComponents": {
+    "word-popup": "/components/word-popup/word-popup"
+  }
+}

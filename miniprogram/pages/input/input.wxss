@@ -1,0 +1,61 @@
+.input-page {
+  padding: 48rpx 40rpx 80rpx;
+}
+
+.hero {
+  padding: 40rpx;
+  margin-bottom: 32rpx;
+}
+
+.hero-title {
+  font-size: 48rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.hero-subtitle {
+  margin-top: 16rpx;
+  color: #7b8794;
+  display: block;
+  line-height: 1.5;
+}
+
+.text-entry {
+  min-height: 360rpx;
+  padding: 32rpx;
+  font-size: 32rpx;
+  border: none;
+}
+
+.placeholder {
+  color: #9aa5b1;
+}
+
+.meta-row {
+  margin: 16rpx 8rpx 24rpx;
+  display: flex;
+  justify-content: space-between;
+  color: #7b8794;
+  font-size: 26rpx;
+}
+
+.error {
+  margin: 0 8rpx 24rpx;
+  color: #d14343;
+  font-size: 26rpx;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.actions button {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+}

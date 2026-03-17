@@ -1,0 +1,30 @@
+<view class="input-page">
+  <view class="hero card">
+    <text class="hero-title">影子跟读</text>
+    <text class="hero-subtitle">把任意英文文本变成「听 → 跟 → 下一句」练习。</text>
+  </view>
+
+  <textarea
+    class="text-entry card"
+    placeholder="Paste or type English text here..."
+    placeholder-class="placeholder"
+    show-confirm-bar="false"
+    auto-height="true"
+    maxlength="-1"
+    cursor-spacing="40"
+    value="{{inputText}}"
+    bindinput="handleInput"
+  />
+
+  <view class="meta-row">
+    <text>字符：{{charCount}}</text>
+    <text>预计句子：{{sentenceEstimate}}</text>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+
+  <view class="actions">
+    <button class="btn-secondary" size="mini" bindtap="handleExample" type="default">试试示例</button>
+    <button class="btn-primary" type="primary" bindtap="handleStart" loading="{{isLoading}}" disabled="{{isLoading}}">开始练习</button>
+  </view>
+</view>

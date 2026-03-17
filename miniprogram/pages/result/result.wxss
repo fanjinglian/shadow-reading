@@ -1,0 +1,51 @@
+.result-page {
+  padding: 64rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+}
+
+.summary {
+  padding: 48rpx;
+  text-align: center;
+}
+
+.summary-title {
+  font-size: 48rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.summary-desc {
+  display: block;
+  font-size: 30rpx;
+  color: #4b5563;
+}
+
+.preview {
+  padding: 32rpx;
+}
+
+.preview-label {
+  font-size: 28rpx;
+  color: #7b8794;
+}
+
+.preview-text {
+  display: block;
+  margin-top: 16rpx;
+  line-height: 1.5;
+}
+
+.result-actions {
+  display: flex;
+  gap: 24rpx;
+}
+
+.result-actions button {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 18rpx;
+  font-size: 32rpx;
+}

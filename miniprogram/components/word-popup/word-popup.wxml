@@ -1,0 +1,12 @@
+<view wx:if="{{show}}" class="popup-mask" bindtap="handleMaskTap">
+  <view class="popup-card card" bindtap="handleCardTap">
+    <view class="popup-header">
+      <text class="popup-title">{{word}}</text>
+      <button class="popup-close" size="mini" bindtap="handleClose">×</button>
+    </view>
+    <text class="popup-ipa">{{phonetic || '加载中...'}} </text>
+    <button class="popup-play btn-primary" bindtap="handlePlay" loading="{{loading}}" disabled="{{loading}}">
+      🔊 播放
+    </button>
+  </view>
+</view>

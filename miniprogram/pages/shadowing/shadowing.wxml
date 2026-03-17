@@ -1,0 +1,48 @@
+<view class="shadow-page">
+  <view class="progress">{{progressText}}</view>
+
+  <view class="sentence card">
+    <text class="sentence-text">{{sentence}}</text>
+  </view>
+
+  <view class="keyword-panel card">
+    <text class="keyword-title">关键词 & 音标</text>
+    <block wx:if="{{keywords.length}}">
+      <block wx:for="{{keywords}}" wx:key="word">
+        <view class="keyword-card" bindtap="handleKeywordTap" data-word="{{item.word}}" data-phonetic="{{item.phonetic}}">
+          <view>
+            <text class="keyword-word">{{item.word}}</text>
+            <text class="keyword-ipa">{{item.phonetic || '加载中...'}}</text>
+          </view>
+          <text class="keyword-icon">🔊</text>
+        </view>
+      </block>
+    </block>
+    <view wx:else class="keyword-empty">系统正在为本句挑选关键词...</view>
+  </view>
+
+  <view class="listen">
+    <button class="btn-primary" bindtap="handleListen" loading="{{isFetchingAudio}}" disabled="{{isFetchingAudio}}">听</button>
+  </view>
+
+  <view class="secondary-actions">
+    <button class="btn-secondary" bindtap="handleReplay" disabled="{{isFetchingAudio}}">重听本句</button>
+    <button class="btn-primary" bindtap="handleNext">{{currentIndex + 1 == total ? '完成' : '下一句'}}</button>
+  </view>
+
+  <word-popup
+    show="{{showWordPopup}}"
+    word="{{popupWord}}"
+    phonetic="{{popupPhonetic}}"
+    loading="{{popupLoading}}"
+    bind:close="handlePopupClose"
+    bind:play="handlePopupPlay"
+  />
+
+  <view wx:if="{{isInitializing}}" class="loading-overlay">
+    <view class="loading-card card">
+      <text class="loading-title">正在准备练习</text>
+      <text class="loading-desc">系统正在拆分句子并获取音标，请稍候...</text>
+    </view>
+  </view>
+</view>

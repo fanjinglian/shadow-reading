@@ -1,0 +1,15 @@
+{
+  "description": "Shadow Reading MVP mini program",
+  "appid": "touristappid",
+  "projectname": "shadow-reading",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "miniprogram/",
+  "setting": {
+    "es6": true,
+    "enhance": false,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  },
+  "condition": {}
+}

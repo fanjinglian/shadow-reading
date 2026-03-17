@@ -1,0 +1,43 @@
+# Shadow Reading MVP
+
+WeChat mini program + FastAPI backend for sentence-by-sentence shadowing practice described in `Shadow Reading（影子跟读）MVP PRD.md`.
+
+## Structure
+
+```
+.
+├── miniprogram/        # WX mini program source
+│   └── pages/
+│       ├── input/      # text entry and session start
+│       ├── shadowing/  # listen → repeat → next drill loop
+│       └── result/     # lightweight completion feedback
+└── backend/            # FastAPI placeholder service
+```
+
+## Prerequisites
+- [WeChat DevTools](https://developers.weixin.qq.com/miniprogram/en/dev/devtools/download.html)
+- Node.js 18+ (for tooling/miniprogram npm packages if you add them later)
+- Python 3.10+ for the FastAPI service
+
+## Running the backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+The sample server listens on `http://127.0.0.1:8000`. Update `miniprogram/utils/api.js` if you deploy elsewhere.
+
+## Running the mini program
+1. Open WeChat DevTools, choose "Mini Program" → "Import".
+2. Select this folder and use `touristappid` while waiting for your real AppID.
+3. Update `BASE_URL` inside `miniprogram/utils/api.js` if your backend host differs.
+4. Use the built-in simulator or a connected device for testing audio playback.
+
+## Next steps
+- Replace stubbed TTS + IPA logic in the backend with your production services (Azure Edge TTS, dictionary API, etc.).
+- Connect persistent storage if you want to record learning history beyond this MVP.
+- Add automated tests (unit + e2e) once flows stabilize.

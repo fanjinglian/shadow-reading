@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/input/input",
+    "pages/shadowing/shadowing",
+    "pages/result/result"
+  ],
+  "window": {
+    "navigationBarTitleText": "Shadow Reading",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2"
+}

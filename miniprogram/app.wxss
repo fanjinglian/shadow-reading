@@ -1,0 +1,31 @@
+page {
+  background-color: #f5f7fa;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  color: #1f2933;
+}
+
+.text-muted {
+  color: #7b8794;
+}
+
+.btn-primary {
+  background-color: #01c38d;
+  color: #ffffff;
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: #01c38d;
+  border: 1px solid #01c38d;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  box-shadow: 0 16rpx 32rpx rgba(15, 23, 42, 0.08);
+}

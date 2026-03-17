@@ -1,0 +1,5 @@
+fastapi==0.110.1
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1
+edge-tts==6.1.9
+eng-to-ipa==0.0.2
