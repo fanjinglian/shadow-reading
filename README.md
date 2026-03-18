@@ -21,15 +21,25 @@ WeChat mini program + FastAPI backend for sentence-by-sentence shadowing practic
 
 ## Running the backend
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+1. Create and activate a virtualenv
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. Copy `.env.example` → `.env` and fill in your Azure Speech key/region plus optional Edge TTS overrides.
+3. Start FastAPI
+   ```bash
+   uvicorn app.main:app --reload
+   ```
 
-The sample server listens on `http://127.0.0.1:8000`. Update `miniprogram/utils/api.js` if you deploy elsewhere.
+The server listens on `http://127.0.0.1:8000` and exposes:
+- `POST /split` – text segmentation + keyword picks
+- `POST /tts` – Edge TTS (en‑GB voice) that stores mp3 files under `generated_audio/` and serves them via `/media/audio/<file>`
+- `GET /phonetic` – English IPA via `eng_to_ipa` (cached in memory)
+
+Update `miniprogram/utils/api.js` if you deploy elsewhere.
 
 ## Running the mini program
 1. Open WeChat DevTools, choose "Mini Program" → "Import".
