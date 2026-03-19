@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 import re
+import time
 import uuid
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import edge_tts
 import eng_to_ipa as ipa
@@ -34,8 +35,58 @@ STOP_WORDS = {"the", "a", "is", "was", "to", "of", "in", "and"}
 VOICE = os.getenv("EDGE_TTS_VOICE", "en-GB-LibbyNeural")
 RATE = os.getenv("EDGE_TTS_RATE", "+0%")
 VOLUME = os.getenv("EDGE_TTS_VOLUME", "+0dB")
+AUDIO_RETENTION_SECONDS = int(os.getenv("AUDIO_RETENTION_SECONDS", "3600"))
+MAX_AUDIO_FILES = int(os.getenv("MAX_AUDIO_FILES", "500"))
+CLEANUP_INTERVAL_SECONDS = 300
 
 IPA_CACHE: Dict[str, str] = {}
+LAST_CLEANUP_TS = 0.0
+NOUN_SUFFIXES: Sequence[str] = (
+  "tion",
+  "sion",
+  "ment",
+  "ness",
+  "ity",
+  "ship",
+  "ence",
+  "ance",
+  "ture",
+  "ology",
+  "ism",
+  "ist",
+  "age",
+  "ery",
+  "ory",
+  "dom",
+  "hood",
+  "ment",
+  "ing",
+)
+COMMON_NOUNS = {
+  "family",
+  "people",
+  "school",
+  "friend",
+  "teacher",
+  "student",
+  "animal",
+  "animals",
+  "story",
+  "world",
+  "lesson",
+  "country",
+  "music",
+  "science",
+  "picture",
+  "children",
+  "garden",
+  "rabbit",
+  "bird",
+  "voice",
+  "earth",
+  "planet",
+  "language",
+}
 
 
 class KeywordHint(BaseModel):
@@ -72,18 +123,27 @@ def split_text(text: str) -> List[str]:
   return [chunk.strip() for chunk in parts if chunk.strip()]
 
 
+def looks_like_noun(word: str) -> bool:
+  root = word.rstrip("s")
+  if word in COMMON_NOUNS or root in COMMON_NOUNS:
+    return True
+  return any(root.endswith(suffix) for suffix in NOUN_SUFFIXES)
+
+
 def choose_keywords(sentence: str) -> List[KeywordHint]:
   tokens = re.sub(r"[^a-zA-Z\s]", " ", sentence).lower().split()
-  picks: List[KeywordHint] = []
-  for token in tokens:
+  seen: set[str] = set()
+  candidates: List[tuple[int, int, int, str]] = []
+  for idx, token in enumerate(tokens):
     if token in STOP_WORDS or len(token) <= 4:
       continue
-    if any(existing.word == token for existing in picks):
+    if token in seen:
       continue
-    picks.append(KeywordHint(word=token))
-    if len(picks) == 2:
-      break
-  return picks
+    seen.add(token)
+    noun_flag = 0 if looks_like_noun(token) else 1
+    candidates.append((noun_flag, idx, -len(token), token))
+  candidates.sort()
+  return [KeywordHint(word=item[3]) for item in candidates[:2]]
 
 
 def british_ipa(word: str) -> str:
@@ -108,7 +168,31 @@ async def synthesize_sentence(text: str) -> str:
   filepath = AUDIO_DIR / filename
   communicator = edge_tts.Communicate(text, VOICE, rate=RATE, volume=VOLUME)
   await communicator.save(str(filepath))
+  cleanup_old_audio()
   return filename
+
+
+def cleanup_old_audio() -> None:
+  global LAST_CLEANUP_TS
+  now = time.time()
+  if now - LAST_CLEANUP_TS < CLEANUP_INTERVAL_SECONDS:
+    return
+  LAST_CLEANUP_TS = now
+  cutoff = now - AUDIO_RETENTION_SECONDS
+
+  audio_files = sorted(AUDIO_DIR.glob("*.mp3"), key=lambda path: path.stat().st_mtime)
+  total = len(audio_files)
+  for path in audio_files:
+    try:
+      stat = path.stat()
+    except FileNotFoundError:
+      continue
+    if stat.st_mtime < cutoff or total > MAX_AUDIO_FILES:
+      try:
+        path.unlink(missing_ok=True)
+        total -= 1
+      except OSError:
+        continue
 
 
 @app.post("/split", response_model=SplitResponse)
