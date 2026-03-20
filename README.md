@@ -41,6 +41,10 @@ The server listens on `http://127.0.0.1:8000` and exposes:
 
 Update `miniprogram/utils/api.js` if you deploy elsewhere.
 
+### Tests & monitoring
+- Run `pytest` inside the `backend/` directory to validate `/split`, `/tts`, `/phonetic`, and audio cleanup logic.
+- FastAPI endpoints now emit basic structured logs (request durations, cleanup counts). Tail your server logs to monitor performance.
+
 ## Running the mini program
 1. Open WeChat DevTools, choose "Mini Program" → "Import".
 2. Select this folder and use `touristappid` while waiting for your real AppID.
