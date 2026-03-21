@@ -8,6 +8,7 @@ Page({
     sentence: '',
     keywords: [],
     progressText: '',
+    progressPercent: 0,
     isPlaying: false,
     isFetchingAudio: false,
     isInitializing: true,
@@ -59,19 +60,23 @@ Page({
     const total = this.session.sentences.length;
     const sentence = this.session.sentences[index];
     const keywords = (this.session.keywords && this.session.keywords[index]) || [];
+    const percent = total ? Math.round(((index + 1) / total) * 100) : 0;
     this.setData({
       currentIndex: index,
       total,
       sentence,
       keywords,
       progressText: `Sentence ${index + 1} / ${total}`,
-      isInitializing: showOverlay ? true : this.data.isInitializing
+      progressPercent: percent,
+      isInitializing: showOverlay
     });
     const ensurePromise = this.ensureKeywordPhonetics(index);
     if (showOverlay) {
       Promise.resolve(ensurePromise).finally(() => {
         this.setData({ isInitializing: false });
       });
+    } else if (this.data.isInitializing) {
+      this.setData({ isInitializing: false });
     }
   },
 
@@ -154,7 +159,7 @@ Page({
       return;
     }
     this.stopAudio();
-    this.updateSentence(nextIndex);
+    this.updateSentence(nextIndex, true);
   },
 
   finishSession() {

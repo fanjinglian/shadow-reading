@@ -1,5 +1,12 @@
 <view class="shadow-page">
-  <view class="progress">{{progressText}}</view>
+  <view class="progress">
+    <text class="progress-label">{{progressText}}</text>
+    <view class="progress-bar">
+      <view class="progress-bar__fill" style="width: {{progressPercent}}%;"></view>
+    </view>
+  </view>
+
+  <view class="flow-hint">Listen · Repeat · Next</view>
 
   <view class="sentence card">
     <text class="sentence-text">{{sentence}}</text>
@@ -22,12 +29,12 @@
   </view>
 
   <view class="listen">
-    <button class="btn-primary" bindtap="handleListen" loading="{{isFetchingAudio}}" disabled="{{isFetchingAudio}}">听</button>
+    <button class="btn-primary" bindtap="handleListen" loading="{{isFetchingAudio}}" disabled="{{isFetchingAudio || isInitializing}}">Listen</button>
   </view>
 
   <view class="secondary-actions">
-    <button class="btn-secondary" bindtap="handleReplay" disabled="{{isFetchingAudio}}">重听本句</button>
-    <button class="btn-primary" bindtap="handleNext">{{currentIndex + 1 == total ? '完成' : '下一句'}}</button>
+    <button class="btn-secondary" bindtap="handleReplay" disabled="{{isFetchingAudio || isInitializing}}">重听本句</button>
+    <button class="btn-primary" bindtap="handleNext" disabled="{{isInitializing}}">{{currentIndex + 1 == total ? '完成' : '下一句'}}</button>
   </view>
 
   <word-popup
@@ -41,7 +48,7 @@
 
   <view wx:if="{{isInitializing}}" class="loading-overlay">
     <view class="loading-card card">
-      <text class="loading-title">正在准备练习</text>
+      <text class="loading-title">正在准备第 {{currentIndex + 1}} 句</text>
       <text class="loading-desc">系统正在拆分句子并获取音标，请稍候...</text>
     </view>
   </view>
