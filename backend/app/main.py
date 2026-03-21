@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -16,6 +17,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 load_dotenv()
+
+logger = logging.getLogger("shadow_reading")
+if not logger.handlers:
+  logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Shadow Reading API", version="0.2.0")
 
@@ -166,8 +171,11 @@ def british_ipa(word: str) -> str:
 async def synthesize_sentence(text: str) -> str:
   filename = f"{uuid.uuid4()}.mp3"
   filepath = AUDIO_DIR / filename
+  started = time.perf_counter()
   communicator = edge_tts.Communicate(text, VOICE, rate=RATE, volume=VOLUME)
   await communicator.save(str(filepath))
+  elapsed = (time.perf_counter() - started) * 1000
+  logger.info("tts_synthesized file=%s duration=%.2fms", filename, elapsed)
   cleanup_old_audio()
   return filename
 
@@ -182,6 +190,7 @@ def cleanup_old_audio() -> None:
 
   audio_files = sorted(AUDIO_DIR.glob("*.mp3"), key=lambda path: path.stat().st_mtime)
   total = len(audio_files)
+  removed = 0
   for path in audio_files:
     try:
       stat = path.stat()
@@ -191,13 +200,24 @@ def cleanup_old_audio() -> None:
       try:
         path.unlink(missing_ok=True)
         total -= 1
+        removed += 1
       except OSError:
         continue
+  if removed:
+    logger.info("audio_cleanup removed=%d remaining=%d", removed, total)
 
 
 @app.post("/split", response_model=SplitResponse)
 async def api_split(payload: SplitRequest) -> SplitResponse:
+  started = time.perf_counter()
   sentences = split_text(payload.text)
+  duration = (time.perf_counter() - started) * 1000
+  logger.info(
+    "split_text sentences=%d payload_chars=%d duration=%.2fms",
+    len(sentences),
+    len(payload.text),
+    duration,
+  )
   return SplitResponse(
     sentences=sentences,
     keywords=[choose_keywords(sentence) for sentence in sentences],
@@ -209,11 +229,17 @@ async def api_tts(payload: TtsRequest, request: Request) -> TtsResponse:
   sentence = payload.sentence.strip()
   if not sentence:
     raise HTTPException(status_code=400, detail="sentence is required")
+  started = time.perf_counter()
   filename = await synthesize_sentence(sentence)
   audio_url = request.url_for("media_audio", path=filename)
+  elapsed = (time.perf_counter() - started) * 1000
+  logger.info("tts_request chars=%d duration=%.2fms", len(sentence), elapsed)
   return TtsResponse(audio_url=str(audio_url))
 
 
 @app.get("/phonetic", response_model=PhoneticResponse)
 async def api_phonetic(word: str = Query(..., min_length=1)) -> PhoneticResponse:
-  return PhoneticResponse(phonetic=british_ipa(word))
+  started = time.perf_counter()
+  phonetic = british_ipa(word)
+  logger.info("phonetic_lookup word=%s duration=%.2fms", word.lower(), (time.perf_counter() - started) * 1000)
+  return PhoneticResponse(phonetic=phonetic)
