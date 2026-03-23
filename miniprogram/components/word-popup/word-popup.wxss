@@ -20,19 +20,23 @@
 }
 
 .popup-close {
+  cursor: pointer;
   position: absolute;
-  top: 20rpx;
-  right: 20rpx;
-  width: 64rpx;
-  height: 64rpx;
+  top: 12rpx;
+  right: 12rpx;
+  width: 52rpx;
+  height: 52rpx;
   border-radius: 50%;
-  border: none;
+  border: 1rpx solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
   color: #111827;
-  font-size: 40rpx;
-  line-height: 64rpx;
+  font-size: 36rpx;
+  line-height: 52rpx;
   text-align: center;
-  box-shadow: 0 8rpx 16rpx rgba(15, 23, 42, 0.15);
+  box-shadow: 0 6rpx 12rpx rgba(15, 23, 42, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .popup-word {

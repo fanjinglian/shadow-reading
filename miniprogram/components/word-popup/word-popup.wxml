@@ -1,6 +1,6 @@
 <view wx:if="{{show}}" class="popup-mask" bindtap="handleMaskTap">
   <view class="popup-card" bindtap="handleCardTap">
-    <button class="popup-close" plain="true" hover-class="none" bindtap="handleClose">×</button>
+    <view class="popup-close" bindtap="handleClose">×</view>
     <text class="popup-word">{{word}}</text>
     <text class="popup-ipa">{{phonetic || '加载中...'}}</text>
     <text class="popup-hint">点击播放，模仿节奏与语调</text>
