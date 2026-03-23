@@ -28,7 +28,7 @@ WeChat mini program + FastAPI backend for sentence-by-sentence shadowing practic
    source .venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Copy `.env.example` → `.env` and fill in your Azure Speech key/region plus optional Edge TTS + audio retention overrides.
+2. Copy `.env.example` → `.env` and (optional) tweak Edge TTS voice/rate/volume or audio retention values. The default configuration uses Microsoft's free Edge TTS service, so you can leave Azure credentials blank for local development.
 3. Start FastAPI
    ```bash
    uvicorn app.main:app --reload
