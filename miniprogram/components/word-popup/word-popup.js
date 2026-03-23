@@ -19,7 +19,8 @@ Component({
       this.triggerEvent('close');
     },
 
-    handlePlay() {
+    handlePlay(event) {
+      event.stopPropagation();
       if (this.data.loading) return;
       this.triggerEvent('play');
     }
