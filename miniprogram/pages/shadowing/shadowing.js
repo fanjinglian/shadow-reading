@@ -28,6 +28,7 @@ Page({
     this.session = session;
     this.audioCache = {};
     this.wordAudioCache = {};
+    this.wordAudioJobs = {};
     this.innerAudio = wx.createInnerAudioContext();
     this.innerAudio.onEnded(() => this.setData({ isPlaying: false }));
     this.innerAudio.onStop(() => this.setData({ isPlaying: false }));
@@ -71,13 +72,14 @@ Page({
       isInitializing: showOverlay
     });
     const ensurePromise = this.ensureKeywordPhonetics(index);
-    if (showOverlay) {
-      Promise.resolve(ensurePromise).finally(() => {
-        this.setData({ isInitializing: false });
+    Promise.resolve(ensurePromise)
+      .catch(() => {})
+      .finally(() => {
+        this.prefetchKeywordAudio(index);
+        if (showOverlay || this.data.isInitializing) {
+          this.setData({ isInitializing: false });
+        }
       });
-    } else if (this.data.isInitializing) {
-      this.setData({ isInitializing: false });
-    }
   },
 
   async ensureKeywordPhonetics(index) {
@@ -173,30 +175,59 @@ Page({
     const phonetic = event.currentTarget.dataset.phonetic;
     if (!word) return;
     this.stopAudio();
+    const cachedUrl = this.wordAudioCache[word] || '';
     this.setData({
       showWordPopup: true,
       popupWord: word,
       popupPhonetic: phonetic || '',
-      popupAudioUrl: this.wordAudioCache[word] || '',
-      popupLoading: !this.wordAudioCache[word]
+      popupAudioUrl: cachedUrl,
+      popupLoading: !cachedUrl
     });
-    if (!this.wordAudioCache[word]) {
-      this.loadWordAudio(word);
+    if (!cachedUrl) {
+      this.ensureWordAudio(word)
+        .then((audioUrl) => {
+          if (this.data.popupWord === word) {
+            this.setData({ popupAudioUrl: audioUrl, popupLoading: false });
+          }
+        })
+        .catch(() => {
+          if (this.data.popupWord === word) {
+            this.setData({ popupLoading: false });
+          }
+        });
     }
   },
 
-  async loadWordAudio(word) {
-    this.setData({ popupLoading: true });
-    try {
-      const audioUrl = await getWordAudio(word);
-      this.wordAudioCache[word] = audioUrl;
-      if (this.data.popupWord === word) {
-        this.setData({ popupAudioUrl: audioUrl, popupLoading: false });
-      }
-    } catch (error) {
-      this.setData({ popupLoading: false });
-      wx.showToast({ title: '单词发音暂不可用', icon: 'none' });
+  prefetchKeywordAudio(index) {
+    const keywords = (this.session.keywords && this.session.keywords[index]) || [];
+    keywords.forEach((item) => {
+      if (!item?.word) return;
+      this.ensureWordAudio(item.word, true).catch(() => {});
+    });
+  },
+
+  ensureWordAudio(word, silent = false) {
+    if (!word) return Promise.resolve('');
+    if (this.wordAudioCache[word]) {
+      return Promise.resolve(this.wordAudioCache[word]);
     }
+    if (!this.wordAudioJobs[word]) {
+      this.wordAudioJobs[word] = getWordAudio(word)
+        .then((audioUrl) => {
+          this.wordAudioCache[word] = audioUrl;
+          return audioUrl;
+        })
+        .catch((error) => {
+          if (!silent) {
+            wx.showToast({ title: '单词发音暂不可用', icon: 'none' });
+          }
+          throw error;
+        })
+        .finally(() => {
+          delete this.wordAudioJobs[word];
+        });
+    }
+    return this.wordAudioJobs[word];
   },
 
   handlePopupClose() {
@@ -212,10 +243,22 @@ Page({
   handlePopupPlay() {
     const { popupWord, popupAudioUrl } = this.data;
     if (!popupWord) return;
-    if (!popupAudioUrl) {
-      this.loadWordAudio(popupWord);
+    if (popupAudioUrl) {
+      this.startPlayback(popupAudioUrl);
       return;
     }
-    this.startPlayback(popupAudioUrl);
+    this.setData({ popupLoading: true });
+    this.ensureWordAudio(popupWord)
+      .then((audioUrl) => {
+        if (this.data.popupWord === popupWord) {
+          this.setData({ popupAudioUrl: audioUrl, popupLoading: false });
+        }
+        this.startPlayback(audioUrl);
+      })
+      .catch(() => {
+        if (this.data.popupWord === popupWord) {
+          this.setData({ popupLoading: false });
+        }
+      });
   }
 });

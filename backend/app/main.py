@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -168,16 +169,25 @@ def british_ipa(word: str) -> str:
   return phonetic
 
 
+def build_audio_filename(text: str) -> Path:
+  normalized = text.strip().lower()
+  digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()
+  return AUDIO_DIR / f"{digest}.mp3"
+
+
 async def synthesize_sentence(text: str) -> str:
-  filename = f"{uuid.uuid4()}.mp3"
-  filepath = AUDIO_DIR / filename
+  filepath = build_audio_filename(text)
+  if filepath.exists():
+    os.utime(filepath, None)
+    logger.info("tts_cache_hit file=%s", filepath.name)
+    return filepath.name
   started = time.perf_counter()
   communicator = edge_tts.Communicate(text, VOICE, rate=RATE, volume=VOLUME)
   await communicator.save(str(filepath))
   elapsed = (time.perf_counter() - started) * 1000
-  logger.info("tts_synthesized file=%s duration=%.2fms", filename, elapsed)
+  logger.info("tts_synthesized file=%s duration=%.2fms", filepath.name, elapsed)
   cleanup_old_audio()
-  return filename
+  return filepath.name
 
 
 def cleanup_old_audio() -> None:
