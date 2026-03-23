@@ -11,16 +11,15 @@ Component({
       this.triggerEvent('close');
     },
 
-    handleCardTap(event) {
-      event.stopPropagation();
+    handleCardTap() {
+      // prevent mask tap
     },
 
     handleClose() {
       this.triggerEvent('close');
     },
 
-    handlePlay(event) {
-      event.stopPropagation();
+    handlePlay() {
       if (this.data.loading) return;
       this.triggerEvent('play');
     }
