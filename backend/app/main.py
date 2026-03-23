@@ -39,7 +39,7 @@ STOP_WORDS = {"the", "a", "is", "was", "to", "of", "in", "and"}
 
 VOICE = os.getenv("EDGE_TTS_VOICE", "en-GB-LibbyNeural")
 RATE = os.getenv("EDGE_TTS_RATE", "+0%")
-VOLUME = os.getenv("EDGE_TTS_VOLUME", "+0dB")
+VOLUME = os.getenv("EDGE_TTS_VOLUME", "+0%")
 AUDIO_RETENTION_SECONDS = int(os.getenv("AUDIO_RETENTION_SECONDS", "3600"))
 MAX_AUDIO_FILES = int(os.getenv("MAX_AUDIO_FILES", "500"))
 CLEANUP_INTERVAL_SECONDS = 300
