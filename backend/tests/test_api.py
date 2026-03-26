@@ -28,6 +28,15 @@ def test_tts_returns_audio_url(client: TestClient):
     assert mock_audio_name in audio_url
 
 
+def test_word_tts_endpoint(client: TestClient):
+    mock_audio_name = 'word-audio.mp3'
+    with mock.patch('app.main.synthesize_sentence', return_value=mock_audio_name):
+        response = client.get('/word-tts', params={'word': 'animals'})
+    assert response.status_code == 200
+    audio_url = response.json()['audio_url']
+    assert mock_audio_name in audio_url
+
+
 def test_cleanup_old_audio(tmp_path, monkeypatch):
     from app import main
 

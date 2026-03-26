@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import time
-import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, List, Sequence
 
@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
 load_dotenv()
@@ -32,6 +33,18 @@ app.add_middleware(
   allow_headers=["*"],
 )
 
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+  async def dispatch(self, request, call_next):
+    request_id = request.headers.get("x-request-id") or hashlib.sha1(os.urandom(16)).hexdigest()
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["x-request-id"] = request_id
+    return response
+
+
+app.add_middleware(RequestIDMiddleware)
+
 AUDIO_DIR = Path(__file__).resolve().parent.parent / "generated_audio"
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media/audio", StaticFiles(directory=AUDIO_DIR), name="media_audio")
@@ -44,6 +57,9 @@ VOLUME = os.getenv("EDGE_TTS_VOLUME", "+0%")
 AUDIO_RETENTION_SECONDS = int(os.getenv("AUDIO_RETENTION_SECONDS", "3600"))
 MAX_AUDIO_FILES = int(os.getenv("MAX_AUDIO_FILES", "500"))
 CLEANUP_INTERVAL_SECONDS = 300
+IN_MEMORY_AUDIO_INDEX_LIMIT = int(os.getenv("IN_MEMORY_AUDIO_INDEX_LIMIT", "256"))
+
+SYNTH_INDEX: OrderedDict[str, str] = OrderedDict()
 
 IPA_CACHE: Dict[str, str] = {}
 LAST_CLEANUP_TS = 0.0
@@ -95,6 +111,12 @@ COMMON_NOUNS = {
 }
 
 
+def log_with_request(request: Request | None, message: str, **fields) -> None:
+  request_id = getattr(request.state, "request_id", "n/a") if request else "n/a"
+  extras = " ".join(f"{key}={value}" for key, value in fields.items())
+  logger.info("[req=%s] %s %s", request_id, message, extras)
+
+
 class KeywordHint(BaseModel):
   word: str
   phonetic: str | None = None
@@ -119,6 +141,12 @@ class TtsResponse(BaseModel):
 
 class PhoneticResponse(BaseModel):
   phonetic: str
+
+
+class WordTiming(BaseModel):
+  word: str
+  start_ms: float
+  end_ms: float
 
 
 def split_text(text: str) -> List[str]:
@@ -175,10 +203,35 @@ def build_audio_filename(text: str) -> Path:
   return AUDIO_DIR / f"{digest}.mp3"
 
 
+def remember_audio(text: str, filename: str) -> None:
+  key = text.strip().lower()
+  SYNTH_INDEX[key] = filename
+  SYNTH_INDEX.move_to_end(key)
+  while len(SYNTH_INDEX) > IN_MEMORY_AUDIO_INDEX_LIMIT:
+    SYNTH_INDEX.popitem(last=False)
+
+
+def get_cached_audio(text: str) -> str | None:
+  key = text.strip().lower()
+  hit = SYNTH_INDEX.get(key)
+  if hit:
+    SYNTH_INDEX.move_to_end(key)
+  return hit
+
+
 async def synthesize_sentence(text: str) -> str:
+  cached_name = get_cached_audio(text)
+  if cached_name:
+    cached_path = AUDIO_DIR / cached_name
+    if cached_path.exists():
+      os.utime(cached_path, None)
+      logger.info("tts_memory_hit file=%s", cached_name)
+      return cached_name
+
   filepath = build_audio_filename(text)
   if filepath.exists():
     os.utime(filepath, None)
+    remember_audio(text, filepath.name)
     logger.info("tts_cache_hit file=%s", filepath.name)
     return filepath.name
   started = time.perf_counter()
@@ -186,6 +239,7 @@ async def synthesize_sentence(text: str) -> str:
   await communicator.save(str(filepath))
   elapsed = (time.perf_counter() - started) * 1000
   logger.info("tts_synthesized file=%s duration=%.2fms", filepath.name, elapsed)
+  remember_audio(text, filepath.name)
   cleanup_old_audio()
   return filepath.name
 
@@ -218,15 +272,16 @@ def cleanup_old_audio() -> None:
 
 
 @app.post("/split", response_model=SplitResponse)
-async def api_split(payload: SplitRequest) -> SplitResponse:
+async def api_split(payload: SplitRequest, request: Request) -> SplitResponse:
   started = time.perf_counter()
   sentences = split_text(payload.text)
   duration = (time.perf_counter() - started) * 1000
-  logger.info(
-    "split_text sentences=%d payload_chars=%d duration=%.2fms",
-    len(sentences),
-    len(payload.text),
-    duration,
+  log_with_request(
+    request,
+    "split_text",
+    sentences=len(sentences),
+    payload_chars=len(payload.text),
+    duration_ms=f"{duration:.2f}",
   )
   return SplitResponse(
     sentences=sentences,
@@ -243,13 +298,47 @@ async def api_tts(payload: TtsRequest, request: Request) -> TtsResponse:
   filename = await synthesize_sentence(sentence)
   audio_url = request.url_for("media_audio", path=filename)
   elapsed = (time.perf_counter() - started) * 1000
-  logger.info("tts_request chars=%d duration=%.2fms", len(sentence), elapsed)
+  log_with_request(request, "tts_request", chars=len(sentence), duration_ms=f"{elapsed:.2f}")
   return TtsResponse(audio_url=str(audio_url))
 
 
 @app.get("/phonetic", response_model=PhoneticResponse)
-async def api_phonetic(word: str = Query(..., min_length=1)) -> PhoneticResponse:
+async def api_phonetic(request: Request, word: str = Query(..., min_length=1)) -> PhoneticResponse:
   started = time.perf_counter()
   phonetic = british_ipa(word)
-  logger.info("phonetic_lookup word=%s duration=%.2fms", word.lower(), (time.perf_counter() - started) * 1000)
+  log_with_request(
+    request,
+    "phonetic_lookup",
+    word=word.lower(),
+    duration_ms=f"{(time.perf_counter() - started) * 1000:.2f}",
+  )
   return PhoneticResponse(phonetic=phonetic)
+
+
+@app.get("/word-tts", response_model=TtsResponse)
+async def api_word_tts(request: Request, word: str = Query(..., min_length=1)) -> TtsResponse:
+  text = word.strip()
+  if not text:
+    raise HTTPException(status_code=400, detail="word is required")
+  started = time.perf_counter()
+  filename = await synthesize_sentence(text)
+  audio_url = request.url_for("media_audio", path=filename) if request else str(filename)
+  log_with_request(
+    request,
+    "word_tts",
+    word=text.lower(),
+    duration_ms=f"{(time.perf_counter() - started) * 1000:.2f}",
+  )
+  return TtsResponse(audio_url=str(audio_url))
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+  async def dispatch(self, request, call_next):
+    request_id = request.headers.get("x-request-id") or hashlib.sha1(os.urandom(16)).hexdigest()
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["x-request-id"] = request_id
+    return response
+
+
+app.add_middleware(RequestIDMiddleware)

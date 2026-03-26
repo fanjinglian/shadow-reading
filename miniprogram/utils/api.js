@@ -67,8 +67,7 @@ async function getPhonetic(word) {
 }
 
 async function getWordAudio(word) {
-  const { audio_url } = await getSentenceTts(word);
-  return audio_url;
+  return request({ url: '/word-tts', method: 'GET', data: { word } }).then((res) => res.audio_url);
 }
 
 module.exports = {

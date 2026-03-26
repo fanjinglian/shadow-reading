@@ -37,6 +37,7 @@ WeChat mini program + FastAPI backend for sentence-by-sentence shadowing practic
 The server listens on `http://127.0.0.1:8000` and exposes:
 - `POST /split` – text segmentation + keyword picks
 - `POST /tts` – Edge TTS (en‑GB voice) that stores mp3 files under `generated_audio/` and serves them via `/media/audio/<file>`
+- `GET /word-tts` – cached single-word TTS optimized for the popup pronunciation cards
 - `GET /phonetic` – English IPA via `eng_to_ipa` (cached in memory)
 
 Update `miniprogram/utils/api.js` if you deploy elsewhere.
