@@ -133,6 +133,7 @@ class SplitResponse(BaseModel):
 
 class TtsRequest(BaseModel):
   sentence: str
+  rate: float | None = None
 
 
 class TtsResponse(BaseModel):
@@ -197,30 +198,42 @@ def british_ipa(word: str) -> str:
   return phonetic
 
 
-def build_audio_filename(text: str) -> Path:
-  normalized = text.strip().lower()
+def build_audio_filename(text: str, rate: str | None = None) -> Path:
+  normalized = f"{text.strip().lower()}::{rate or RATE}"
   digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()
   return AUDIO_DIR / f"{digest}.mp3"
 
 
-def remember_audio(text: str, filename: str) -> None:
-  key = text.strip().lower()
+def normalize_rate(value: float | str | None) -> str:
+  if value is None:
+    return RATE
+  try:
+    numeric = float(value)
+  except (TypeError, ValueError):
+    return RATE
+  numeric = max(-50.0, min(50.0, numeric))
+  return f"{int(numeric):+d}%"
+
+
+def remember_audio(text: str, rate: str, filename: str) -> None:
+  key = f"{text.strip().lower()}::{rate}"
   SYNTH_INDEX[key] = filename
   SYNTH_INDEX.move_to_end(key)
   while len(SYNTH_INDEX) > IN_MEMORY_AUDIO_INDEX_LIMIT:
     SYNTH_INDEX.popitem(last=False)
 
 
-def get_cached_audio(text: str) -> str | None:
-  key = text.strip().lower()
+def get_cached_audio(text: str, rate: str) -> str | None:
+  key = f"{text.strip().lower()}::{rate}"
   hit = SYNTH_INDEX.get(key)
   if hit:
     SYNTH_INDEX.move_to_end(key)
   return hit
 
 
-async def synthesize_sentence(text: str) -> str:
-  cached_name = get_cached_audio(text)
+async def synthesize_sentence(text: str, rate: float | str | None = None) -> str:
+  rate_value = normalize_rate(rate)
+  cached_name = get_cached_audio(text, rate_value)
   if cached_name:
     cached_path = AUDIO_DIR / cached_name
     if cached_path.exists():
@@ -228,18 +241,18 @@ async def synthesize_sentence(text: str) -> str:
       logger.info("tts_memory_hit file=%s", cached_name)
       return cached_name
 
-  filepath = build_audio_filename(text)
+  filepath = build_audio_filename(text, rate_value)
   if filepath.exists():
     os.utime(filepath, None)
-    remember_audio(text, filepath.name)
+    remember_audio(text, rate_value, filepath.name)
     logger.info("tts_cache_hit file=%s", filepath.name)
     return filepath.name
   started = time.perf_counter()
-  communicator = edge_tts.Communicate(text, VOICE, rate=RATE, volume=VOLUME)
+  communicator = edge_tts.Communicate(text, VOICE, rate=rate_value, volume=VOLUME)
   await communicator.save(str(filepath))
   elapsed = (time.perf_counter() - started) * 1000
   logger.info("tts_synthesized file=%s duration=%.2fms", filepath.name, elapsed)
-  remember_audio(text, filepath.name)
+  remember_audio(text, rate_value, filepath.name)
   cleanup_old_audio()
   return filepath.name
 
@@ -295,10 +308,16 @@ async def api_tts(payload: TtsRequest, request: Request) -> TtsResponse:
   if not sentence:
     raise HTTPException(status_code=400, detail="sentence is required")
   started = time.perf_counter()
-  filename = await synthesize_sentence(sentence)
+  filename = await synthesize_sentence(sentence, payload.rate)
   audio_url = request.url_for("media_audio", path=filename)
   elapsed = (time.perf_counter() - started) * 1000
-  log_with_request(request, "tts_request", chars=len(sentence), duration_ms=f"{elapsed:.2f}")
+  log_with_request(
+    request,
+    "tts_request",
+    chars=len(sentence),
+    rate=normalize_rate(payload.rate),
+    duration_ms=f"{elapsed:.2f}",
+  )
   return TtsResponse(audio_url=str(audio_url))
 
 
@@ -316,17 +335,22 @@ async def api_phonetic(request: Request, word: str = Query(..., min_length=1)) -
 
 
 @app.get("/word-tts", response_model=TtsResponse)
-async def api_word_tts(request: Request, word: str = Query(..., min_length=1)) -> TtsResponse:
+async def api_word_tts(
+  request: Request,
+  word: str = Query(..., min_length=1),
+  rate: float | None = Query(default=None),
+) -> TtsResponse:
   text = word.strip()
   if not text:
     raise HTTPException(status_code=400, detail="word is required")
   started = time.perf_counter()
-  filename = await synthesize_sentence(text)
+  filename = await synthesize_sentence(text, rate)
   audio_url = request.url_for("media_audio", path=filename) if request else str(filename)
   log_with_request(
     request,
     "word_tts",
     word=text.lower(),
+    rate=normalize_rate(rate),
     duration_ms=f"{(time.perf_counter() - started) * 1000:.2f}",
   )
   return TtsResponse(audio_url=str(audio_url))

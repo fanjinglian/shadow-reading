@@ -8,6 +8,13 @@
 
   <view class="flow-hint">Listen · Repeat · Next</view>
 
+  <view class="rate-control">
+    <text class="rate-label">语速</text>
+    <picker class="rate-picker" mode="selector" value="{{rateIndex}}" range="{{rateOptions}}" range-key="label" bindchange="handleRateChange">
+      <view class="rate-display">{{rateOptions[rateIndex].label}}</view>
+    </picker>
+  </view>
+
   <view class="sentence card">
     <text class="sentence-text">{{sentence}}</text>
   </view>

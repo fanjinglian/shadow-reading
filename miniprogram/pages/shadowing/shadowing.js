@@ -16,10 +16,23 @@ Page({
     popupWord: '',
     popupPhonetic: '',
     popupLoading: false,
-    popupAudioUrl: ''
+    popupAudioUrl: '',
+    speechRate: 0,
+    rateIndex: 1,
+    rateOptions: [
+      { label: '更慢', value: -30 },
+      { label: '标准', value: 0 },
+      { label: '稍快', value: 15 },
+      { label: '快速', value: 30 }
+    ]
   },
 
   onLoad() {
+    const storedRate = wx.getStorageSync('speechRate');
+    const rateIndex = this.data.rateOptions.findIndex((option) => option.value === storedRate);
+    const initialIndex = rateIndex >= 0 ? rateIndex : 1;
+    const initialRate = this.data.rateOptions[initialIndex]?.value || 0;
+    this.setData({ speechRate: initialRate, rateIndex: initialIndex });
     const session = app.globalData.session;
     if (!session || !session.sentences?.length) {
       this.redirectHome();
@@ -119,7 +132,7 @@ Page({
       if (cachedUrl && forceReplay) {
         this.startPlayback(cachedUrl);
       } else {
-        const { audio_url } = await getSentenceTts(this.data.sentence);
+        const { audio_url } = await getSentenceTts(this.data.sentence, this.data.speechRate);
         if (!audio_url) throw new Error('后端未返回音频 URL');
         this.audioCache[index] = audio_url;
         this.startPlayback(audio_url);
@@ -175,7 +188,9 @@ Page({
     const phonetic = event.currentTarget.dataset.phonetic;
     if (!word) return;
     this.stopAudio();
-    const cachedUrl = this.wordAudioCache[word] || '';
+    const rate = this.data.speechRate;
+    const cacheKey = this.getWordCacheKey(word, rate);
+    const cachedUrl = this.wordAudioCache[cacheKey] || '';
     this.setData({
       showWordPopup: true,
       popupWord: word,
@@ -184,7 +199,7 @@ Page({
       popupLoading: !cachedUrl
     });
     if (!cachedUrl) {
-      this.ensureWordAudio(word)
+      this.ensureWordAudio(word, false, rate)
         .then((audioUrl) => {
           if (this.data.popupWord === word) {
             this.setData({ popupAudioUrl: audioUrl, popupLoading: false });
@@ -202,19 +217,20 @@ Page({
     const keywords = (this.session.keywords && this.session.keywords[index]) || [];
     keywords.forEach((item) => {
       if (!item?.word) return;
-      this.ensureWordAudio(item.word, true).catch(() => {});
+      this.ensureWordAudio(item.word, true, this.data.speechRate).catch(() => {});
     });
   },
 
-  ensureWordAudio(word, silent = false) {
+  ensureWordAudio(word, silent = false, rate = this.data.speechRate) {
     if (!word) return Promise.resolve('');
-    if (this.wordAudioCache[word]) {
-      return Promise.resolve(this.wordAudioCache[word]);
+    const cacheKey = this.getWordCacheKey(word, rate);
+    if (this.wordAudioCache[cacheKey]) {
+      return Promise.resolve(this.wordAudioCache[cacheKey]);
     }
-    if (!this.wordAudioJobs[word]) {
-      this.wordAudioJobs[word] = getWordAudio(word)
+    if (!this.wordAudioJobs[cacheKey]) {
+      this.wordAudioJobs[cacheKey] = getWordAudio(word, rate)
         .then((audioUrl) => {
-          this.wordAudioCache[word] = audioUrl;
+          this.wordAudioCache[cacheKey] = audioUrl;
           return audioUrl;
         })
         .catch((error) => {
@@ -224,10 +240,22 @@ Page({
           throw error;
         })
         .finally(() => {
-          delete this.wordAudioJobs[word];
+          delete this.wordAudioJobs[cacheKey];
         });
     }
-    return this.wordAudioJobs[word];
+    return this.wordAudioJobs[cacheKey];
+  },
+
+  getWordCacheKey(word, rate) {
+    return `${word}_${rate}`;
+  },
+
+  handleRateChange(event) {
+    const index = Number(event.detail.value);
+    const option = this.data.rateOptions[index] || this.data.rateOptions[1];
+    this.setData({ rateIndex: index, speechRate: option.value });
+    wx.setStorageSync('speechRate', option.value);
+    this.prefetchKeywordAudio(this.data.currentIndex);
   },
 
   handlePopupClose() {
@@ -248,7 +276,7 @@ Page({
       return;
     }
     this.setData({ popupLoading: true });
-    this.ensureWordAudio(popupWord)
+    this.ensureWordAudio(popupWord, false, this.data.speechRate)
       .then((audioUrl) => {
         if (this.data.popupWord === popupWord) {
           this.setData({ popupAudioUrl: audioUrl, popupLoading: false });

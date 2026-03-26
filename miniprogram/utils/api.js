@@ -58,16 +58,16 @@ async function splitText(text) {
   }
 }
 
-async function getSentenceTts(sentence) {
-  return request({ url: '/tts', method: 'POST', data: { sentence } });
+async function getSentenceTts(sentence, rate = 0) {
+  return request({ url: '/tts', method: 'POST', data: { sentence, rate } });
 }
 
 async function getPhonetic(word) {
   return request({ url: '/phonetic', method: 'GET', data: { word } });
 }
 
-async function getWordAudio(word) {
-  return request({ url: '/word-tts', method: 'GET', data: { word } }).then((res) => res.audio_url);
+async function getWordAudio(word, rate = 0) {
+  return request({ url: '/word-tts', method: 'GET', data: { word, rate } }).then((res) => res.audio_url);
 }
 
 module.exports = {

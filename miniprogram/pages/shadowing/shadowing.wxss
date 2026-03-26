@@ -41,6 +41,34 @@
   letter-spacing: 4rpx;
 }
 
+.rate-control {
+  margin: 8rpx 0 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+.rate-label {
+  color: #6b7280;
+  font-size: 28rpx;
+}
+
+.rate-picker {
+  flex: none;
+}
+
+.rate-display {
+  min-width: 140rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  border: 2rpx solid #01c38d;
+  text-align: center;
+  color: #01a978;
+  font-size: 26rpx;
+}
+
 .sentence {
   padding: 48rpx 40rpx;
   background: #fdfdfd;
