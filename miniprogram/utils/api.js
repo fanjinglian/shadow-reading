@@ -1,21 +1,43 @@
 const BASE_URL = 'http://127.0.0.1:8000';
 const STOP_WORDS = new Set(['the', 'a', 'is', 'was', 'to', 'of', 'in', 'and']);
+const REQUEST_TIMEOUT = 10000;
+const REQUEST_LOG_TAG = '[API]';
 
-function request({ url, method = 'GET', data }) {
+function logRequest({ url, method, status, duration, message }) {
+  console.info(
+    `${REQUEST_LOG_TAG} ${method} ${url} status=${status} duration=${duration}ms${message ? ` message=${message}` : ''}`
+  );
+}
+
+function request({ url, method = 'GET', data, suppressToast = false }) {
+  const started = Date.now();
   return new Promise((resolve, reject) => {
     wx.request({
       url: `${BASE_URL}${url}`,
       method,
       data,
-      timeout: 10000,
+      timeout: REQUEST_TIMEOUT,
       success: (res) => {
+        const duration = Date.now() - started;
+        logRequest({ url, method, status: res.statusCode, duration });
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data);
         } else {
-          reject(new Error(res.data?.message || '服务器返回错误'));
+          const message = res.data?.detail || res.data?.message || '服务器返回错误';
+          if (!suppressToast) {
+            wx.showToast({ title: message, icon: 'none' });
+          }
+          reject(new Error(message));
         }
       },
-      fail: (err) => reject(err)
+      fail: (err) => {
+        const duration = Date.now() - started;
+        logRequest({ url, method, status: 'NETWORK_ERROR', duration, message: err?.errMsg });
+        if (!suppressToast) {
+          wx.showToast({ title: '网络连接失败，请稍后重试', icon: 'none' });
+        }
+        reject(err instanceof Error ? err : new Error(err?.errMsg || '网络错误'));
+      }
     });
   });
 }
@@ -46,10 +68,11 @@ function guessKeywords(sentence) {
 
 async function splitText(text) {
   try {
-    const data = await request({ url: '/split', method: 'POST', data: { text } });
+    const data = await request({ url: '/split', method: 'POST', data: { text }, suppressToast: true });
     return data;
   } catch (error) {
     console.warn('Using fallback split logic', error);
+    wx.showToast({ title: '网络异常，使用本地拆分', icon: 'none' });
     const sentences = normalizeSentences(text);
     return {
       sentences,
@@ -59,15 +82,17 @@ async function splitText(text) {
 }
 
 async function getSentenceTts(sentence, rate = 0) {
-  return request({ url: '/tts', method: 'POST', data: { sentence, rate } });
+  return request({ url: '/tts', method: 'POST', data: { sentence, rate }, suppressToast: true });
 }
 
 async function getPhonetic(word) {
-  return request({ url: '/phonetic', method: 'GET', data: { word } });
+  return request({ url: '/phonetic', method: 'GET', data: { word }, suppressToast: true });
 }
 
 async function getWordAudio(word, rate = 0) {
-  return request({ url: '/word-tts', method: 'GET', data: { word, rate } }).then((res) => res.audio_url);
+  return request({ url: '/word-tts', method: 'GET', data: { word, rate }, suppressToast: true }).then(
+    (res) => res.audio_url
+  );
 }
 
 module.exports = {

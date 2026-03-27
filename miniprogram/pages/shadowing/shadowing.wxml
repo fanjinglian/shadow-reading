@@ -8,11 +8,29 @@
 
   <view class="flow-hint">Listen · Repeat · Next</view>
 
-  <view class="rate-control">
-    <text class="rate-label">语速</text>
-    <picker class="rate-picker" mode="selector" value="{{rateIndex}}" range="{{rateOptions}}" range-key="label" bindchange="handleRateChange">
-      <view class="rate-display">{{rateOptions[rateIndex].label}}</view>
-    </picker>
+  <view class="rate-control card">
+    <view class="rate-header">
+      <text class="rate-label">语速</text>
+      <text class="rate-value">{{rateDisplay}}</text>
+    </view>
+    <slider
+      class="rate-slider"
+      min="{{minRate}}"
+      max="{{maxRate}}"
+      step="{{rateStep}}"
+      value="{{speechRate}}"
+      activeColor="#00a86b"
+      backgroundColor="#dbe9e1"
+      block-size="24"
+      block-color="#00a86b"
+      bindchanging="handleRateSliderChanging"
+      bindchange="handleRateSliderChange"
+    />
+    <view class="rate-marks">
+      <block wx:for="{{rateMarks}}" wx:key="value">
+        <text>{{item.label}}</text>
+      </block>
+    </view>
   </view>
 
   <view class="sentence card">

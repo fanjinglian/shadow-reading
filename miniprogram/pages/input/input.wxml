@@ -1,7 +1,12 @@
 <view class="input-page">
   <view class="hero card">
     <text class="hero-title">影子跟读</text>
+    <text class="hero-badge">沉浸式学习</text>
     <text class="hero-subtitle">把任意英文文本变成「听 → 跟 → 下一句」练习。</text>
+    <view class="hero-visual">
+      <text class="hero-visual-tag">语感训练</text>
+      <text class="hero-visual-desc">聆听节奏、模仿语调，像影子一样紧随其后。</text>
+    </view>
   </view>
 
   <textarea

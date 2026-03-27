@@ -18,21 +18,22 @@ Page({
     popupLoading: false,
     popupAudioUrl: '',
     speechRate: 0,
-    rateIndex: 1,
-    rateOptions: [
-      { label: '更慢', value: -30 },
+    rateDisplay: '标准',
+    minRate: -40,
+    maxRate: 40,
+    rateStep: 5,
+    rateMarks: [
+      { label: '更慢', value: -40 },
+      { label: '慢', value: -20 },
       { label: '标准', value: 0 },
-      { label: '稍快', value: 15 },
-      { label: '快速', value: 30 }
+      { label: '快', value: 20 },
+      { label: '更快', value: 40 }
     ]
   },
 
   onLoad() {
     const storedRate = wx.getStorageSync('speechRate');
-    const rateIndex = this.data.rateOptions.findIndex((option) => option.value === storedRate);
-    const initialIndex = rateIndex >= 0 ? rateIndex : 1;
-    const initialRate = this.data.rateOptions[initialIndex]?.value || 0;
-    this.setData({ speechRate: initialRate, rateIndex: initialIndex });
+    this.applySpeechRate(typeof storedRate === 'number' ? storedRate : 0, false, false);
     const session = app.globalData.session;
     if (!session || !session.sentences?.length) {
       this.redirectHome();
@@ -42,6 +43,8 @@ Page({
     this.audioCache = {};
     this.wordAudioCache = {};
     this.wordAudioJobs = {};
+    this.sentenceAudioJobs = {};
+    this.rateWarmupTimer = null;
     this.innerAudio = wx.createInnerAudioContext();
     this.innerAudio.onEnded(() => this.setData({ isPlaying: false }));
     this.innerAudio.onStop(() => this.setData({ isPlaying: false }));
@@ -56,6 +59,10 @@ Page({
     this.stopAudio();
     if (this.innerAudio) {
       this.innerAudio.destroy();
+    }
+    if (this.rateWarmupTimer) {
+      clearTimeout(this.rateWarmupTimer);
+      this.rateWarmupTimer = null;
     }
   },
 
@@ -89,6 +96,8 @@ Page({
       .catch(() => {})
       .finally(() => {
         this.prefetchKeywordAudio(index);
+        this.prefetchSentenceAudio(index);
+        this.prefetchSentenceAudio(index + 1);
         if (showOverlay || this.data.isInitializing) {
           this.setData({ isInitializing: false });
         }
@@ -120,28 +129,32 @@ Page({
   },
 
   async playCurrentSentence(forceReplay = false) {
-    if (this.data.isFetchingAudio) return;
     const index = this.data.currentIndex;
-    const cachedUrl = this.audioCache[index];
+    const rate = this.clampRate(this.data.speechRate);
+    const cachedUrl = this.audioCache[index]?.[rate];
     if (cachedUrl && !forceReplay) {
       this.startPlayback(cachedUrl);
       return;
     }
-    this.setData({ isFetchingAudio: true });
-    try {
-      if (cachedUrl && forceReplay) {
-        this.startPlayback(cachedUrl);
-      } else {
-        const { audio_url } = await getSentenceTts(this.data.sentence, this.data.speechRate);
-        if (!audio_url) throw new Error('后端未返回音频 URL');
-        this.audioCache[index] = audio_url;
-        this.startPlayback(audio_url);
-      }
-    } catch (error) {
-      wx.showToast({ title: error.message || '播放失败', icon: 'none' });
-    } finally {
-      this.setData({ isFetchingAudio: false });
+    if (cachedUrl && forceReplay) {
+      this.startPlayback(cachedUrl);
+      return;
     }
+    this.setData({ isFetchingAudio: true });
+    this.ensureSentenceAudio(index, rate)
+      .then((audioUrl) => {
+        if (audioUrl) {
+          this.startPlayback(audioUrl);
+        } else {
+          wx.showToast({ title: '播放失败', icon: 'none' });
+        }
+      })
+      .catch((error) => {
+        wx.showToast({ title: error?.message || '播放失败', icon: 'none' });
+      })
+      .finally(() => {
+        this.setData({ isFetchingAudio: false });
+      });
   },
 
   startPlayback(url) {
@@ -214,10 +227,12 @@ Page({
   },
 
   prefetchKeywordAudio(index) {
+    if (!this.session?.keywords) return;
+    const rate = this.data.speechRate;
     const keywords = (this.session.keywords && this.session.keywords[index]) || [];
     keywords.forEach((item) => {
       if (!item?.word) return;
-      this.ensureWordAudio(item.word, true, this.data.speechRate).catch(() => {});
+      this.ensureWordAudio(item.word, true, rate).catch(() => {});
     });
   },
 
@@ -250,12 +265,94 @@ Page({
     return `${word}_${rate}`;
   },
 
-  handleRateChange(event) {
-    const index = Number(event.detail.value);
-    const option = this.data.rateOptions[index] || this.data.rateOptions[1];
-    this.setData({ rateIndex: index, speechRate: option.value });
-    wx.setStorageSync('speechRate', option.value);
-    this.prefetchKeywordAudio(this.data.currentIndex);
+  getSentenceCacheKey(index, rate) {
+    return `${index}_${rate}`;
+  },
+
+  ensureSentenceAudio(index, rate = this.data.speechRate) {
+    const sentence = this.session?.sentences?.[index];
+    if (!sentence) {
+      return Promise.reject(new Error('句子不存在'));
+    }
+    const normalizedRate = this.clampRate(Number(rate));
+    const cacheForIndex = this.audioCache[index];
+    if (cacheForIndex && cacheForIndex[normalizedRate]) {
+      return Promise.resolve(cacheForIndex[normalizedRate]);
+    }
+    if (!this.sentenceAudioJobs) {
+      this.sentenceAudioJobs = {};
+    }
+    const jobKey = this.getSentenceCacheKey(index, normalizedRate);
+    if (!this.sentenceAudioJobs[jobKey]) {
+      this.sentenceAudioJobs[jobKey] = getSentenceTts(sentence, normalizedRate)
+        .then(({ audio_url }) => {
+          if (!audio_url) throw new Error('后端未返回音频 URL');
+          if (!this.audioCache[index]) {
+            this.audioCache[index] = {};
+          }
+          this.audioCache[index][normalizedRate] = audio_url;
+          return audio_url;
+        })
+        .finally(() => {
+          delete this.sentenceAudioJobs[jobKey];
+        });
+    }
+    return this.sentenceAudioJobs[jobKey];
+  },
+
+  prefetchSentenceAudio(index) {
+    if (index == null || index < 0 || !this.session?.sentences?.[index]) return;
+    this.ensureSentenceAudio(index, this.data.speechRate).catch(() => {});
+  },
+
+  clampRate(value) {
+    if (Number.isNaN(value)) return 0;
+    const rounded = Math.round(value / this.data.rateStep) * this.data.rateStep;
+    return Math.max(this.data.minRate, Math.min(this.data.maxRate, rounded));
+  },
+
+  formatRateLabel(value) {
+    if (value === 0) return '标准';
+    if (value > 0) return `+${value}%`;
+    return `${value}%`;
+  },
+
+  applySpeechRate(value, persist = true, prefetch = true) {
+    const normalized = this.clampRate(Number(value));
+    this.setData({
+      speechRate: normalized,
+      rateDisplay: this.formatRateLabel(normalized)
+    });
+    if (persist) {
+      wx.setStorageSync('speechRate', normalized);
+    }
+    if (prefetch) {
+      this.prefetchKeywordAudio(this.data.currentIndex);
+      this.prefetchSentenceAudio(this.data.currentIndex);
+      this.prefetchSentenceAudio(this.data.currentIndex + 1);
+    }
+    return normalized;
+  },
+
+  handleRateSliderChanging(event) {
+    const value = event.detail.value;
+    this.applySpeechRate(value, false, false);
+    this.scheduleRateWarmup(value);
+  },
+
+  handleRateSliderChange(event) {
+    this.applySpeechRate(event.detail.value, true, true);
+  },
+
+  scheduleRateWarmup(value) {
+    if (this.rateWarmupTimer) {
+      clearTimeout(this.rateWarmupTimer);
+    }
+    const normalized = this.clampRate(Number(value));
+    this.rateWarmupTimer = setTimeout(() => {
+      this.rateWarmupTimer = null;
+      this.ensureSentenceAudio(this.data.currentIndex, normalized).catch(() => {});
+    }, 250);
   },
 
   handlePopupClose() {
